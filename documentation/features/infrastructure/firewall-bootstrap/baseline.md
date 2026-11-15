@@ -1,6 +1,6 @@
 # Firewall — Behavior Baseline
 
-- Rule name is `TeslaPC Server`.
+- Rule name is `TesRemoteDesktop Server`. An older rule with a different name is left in place.
 - Ports are `8080` and `8443`, protocol TCP, direction in, action allow, profile any.
 - `--localhost` does not call `open_firewall`.
 - Failure is logged and does not stop HTTP.

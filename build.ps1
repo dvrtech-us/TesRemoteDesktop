@@ -1,10 +1,10 @@
 <#
 .SYNOPSIS
-    Builds the TeslaPC Rust server.
+    Builds the TesRemoteDesktop Rust server.
 
 .DESCRIPTION
     Wraps cargo build so a build is one command from the repo root.
-    The binary is teslapc/target/<config>/teslapc.exe. Static pages are compiled in.
+    The binary is tesremotedesktop/target/<config>/tesremotedesktop.exe. Static pages are compiled in.
 
 .PARAMETER Configuration
     Build configuration: Release (default) or Debug.
@@ -31,7 +31,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$manifest = Join-Path $PSScriptRoot 'teslapc\Cargo.toml'
+$manifest = Join-Path $PSScriptRoot 'tesremotedesktop\Cargo.toml'
 
 # A normal PowerShell has no LIB. VS 18 link.exe then cannot open msvcrt.lib.
 if (-not $env:LIB -or -not (Test-Path -LiteralPath (Join-Path ($env:LIB -split ';' | Select-Object -First 1) 'msvcrt.lib'))) {
@@ -42,18 +42,18 @@ if (-not $env:LIB -or -not (Test-Path -LiteralPath (Join-Path ($env:LIB -split '
 if ($Configuration -eq 'Release') {
     Write-Host "Building Release ..."
     cargo build --manifest-path $manifest --release
-    $built = Join-Path $PSScriptRoot 'teslapc\target\release\teslapc.exe'
+    $built = Join-Path $PSScriptRoot 'tesremotedesktop\target\release\tesremotedesktop.exe'
 } else {
     Write-Host "Building Debug ..."
     cargo build --manifest-path $manifest
-    $built = Join-Path $PSScriptRoot 'teslapc\target\debug\teslapc.exe'
+    $built = Join-Path $PSScriptRoot 'tesremotedesktop\target\debug\tesremotedesktop.exe'
 }
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 if ($Publish) {
     $outDir = if ([System.IO.Path]::IsPathRooted($Output)) { $Output } else { Join-Path $PSScriptRoot $Output }
     New-Item -ItemType Directory -Force -Path $outDir | Out-Null
-    Copy-Item $built (Join-Path $outDir 'teslapc.exe') -Force
+    Copy-Item $built (Join-Path $outDir 'tesremotedesktop.exe') -Force
     Write-Host "Published $built to $outDir"
 }
 

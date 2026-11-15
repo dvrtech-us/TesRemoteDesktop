@@ -1,4 +1,4 @@
-# TeslaPC project MCP servers (loaded when working in this repo)
+# TesRemoteDesktop project MCP servers (loaded when working in this repo)
 
 [mcp_servers.mcp-debugger]
 command = "npx"

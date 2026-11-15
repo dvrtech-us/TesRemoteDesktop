@@ -1,17 +1,17 @@
 # Windows Service (supervisor and session host)
 
-On Windows the supported unattended setup is the `TeslaPC` service. One binary runs in three
+On Windows the supported unattended setup is the `TesRemoteDesktop` service. One binary runs in three
 roles:
 
 | Command | Role | Session / account |
 |---------|------|-------------------|
-| `teslapc.exe` (no role flag) | The whole server, as before (`serve.rs` `serve`) | Whoever started it |
-| `teslapc.exe --service` | **Supervisor only.** Started by the Service Control Manager. Binds no port, captures nothing, plays no audio | Session 0, LocalSystem |
-| `teslapc.exe --session-host --supervisor-pid <pid>` | The whole server, started by the supervisor | Active console session, SYSTEM |
+| `tesremotedesktop.exe` (no role flag) | The whole server, as before (`serve.rs` `serve`) | Whoever started it |
+| `tesremotedesktop.exe --service` | **Supervisor only.** Started by the Service Control Manager. Binds no port, captures nothing, plays no audio | Session 0, LocalSystem |
+| `tesremotedesktop.exe --session-host --supervisor-pid <pid>` | The whole server, started by the supervisor | Active console session, SYSTEM |
 
-Code: `teslapc/src/win_service.rs` (OS calls), `teslapc/src/decisions/service.rs` (pure
-decisions, tested in `teslapc/tests/protocol.rs`), `teslapc/src/serve.rs` (argument handling),
-`teslapc/src/paths.rs` (`host_log_file`, `service_log_file`).
+Code: `tesremotedesktop/src/win_service.rs` (OS calls), `tesremotedesktop/src/decisions/service.rs` (pure
+decisions, tested in `tesremotedesktop/tests/protocol.rs`), `tesremotedesktop/src/serve.rs` (argument handling),
+`tesremotedesktop/src/paths.rs` (`host_log_file`, `service_log_file`).
 
 The session host follows the input desktop: its capture thread and its single `Input` thread
 re-attach to whichever desktop receives input, so the stream shows and controls the sign-in
@@ -21,11 +21,21 @@ compiled on macOS for `x86_64-pc-windows-msvc`; it has not yet run on Windows.
 
 ## Install and uninstall
 
-`teslapc service install` (elevated prompt):
+`tesremotedesktop service install` (elevated prompt), in this order:
+
+1. Locate `current_exe` and open the Service Control Manager. Either failure returns `1` and changes nothing.
+2. If a service named `TeslaPC` exists, clear its failure actions (empty action list, so `cActions` is 0, and an empty failure command), stop it, and wait until it reports stopped and `tasklist /FI "IMAGENAME eq teslapc.exe" /FO CSV /NH` does not list that image. The wait is `OLD_SERVICE_STOP_LIMIT_MS` (`30000`), polled every 250 ms. A failed `tasklist` counts as the executable still running. The decision is `old_service_plan`: stopped and no process is `Replace`; anything else still inside the limit keeps waiting; past the limit is `Abort`. Abort prints an error, copies nothing, does not create `TesRemoteDesktop`, and does not delete `TeslaPC`. Failure actions already cleared are not restored. The old service handle is dropped before any later delete.
+3. Copy `.env`, `cert.pem`, `key.pem`, and `acme-account.json` (those names come from `paths::env_file`, `cert_pem`, `key_pem`, and `acme_account`) and the database (`teslapc.db` to `tesremotedesktop.db`) from `%ProgramData%\TeslaPC` into `%ProgramData%\TesRemoteDesktop`. A file is copied only when the destination file is absent. The copy goes to `<dest>.migrate-tmp` and is renamed into place. Each copy and each skip is printed. The old folder, its files, and the old binary are not modified or deleted. Logs are not copied. A copy error returns `1` without creating the new service and without deleting the old one.
+4. Create or update `TesRemoteDesktop`. If that fails, the old service is not deleted.
+5. If the old service existed, delete it with a fresh `DELETE` open.
+6. Warn about scheduled tasks (below). Install does not start the service.
+
+The create-or-update step:
 
 - Uses `windows_service::service_manager::ServiceManager` (no `sc.exe`). Name and display name
-  `TeslaPC` (`SERVICE_NAME`, `SERVICE_DISPLAY_NAME`), own process, `AutoStart`,
-  `ServiceErrorControl::Normal`, LocalSystem (`account_name: None`).
+  `TesRemoteDesktop` (`SERVICE_NAME`, `SERVICE_DISPLAY_NAME`), own process, `AutoStart`,
+  `ServiceErrorControl::Normal`, LocalSystem (`account_name: None`). Description is
+  `SERVICE_DESCRIPTION`.
 - Executable is `std::env::current_exe()`; launch arguments are `service_launch_arguments()`
   (`["--service"]`). The `windows-service` crate quotes the path only when it contains a space,
   tab, newline, or quote, and joins the arguments with one space, so `ImagePath` has no leading
@@ -36,16 +46,17 @@ compiled on macOS for `x86_64-pc-windows-msvc`; it has not yet run on Windows.
 - Sets the description, then failure actions: three `Restart` actions with
   `SERVICE_RESTART_DELAY_MS` (`5000`) delay, reset period 24 h. A failure here is printed and
   the install still succeeds.
-- Does not start the service. It prints `Start it with sc start TeslaPC or reboot.`
-- Then runs `schtasks /query /fo csv /v` and passes stdout to `tasks_running_teslapc`, which
-  returns the TaskName (second column) of every row that contains `teslapc.exe`
-  (case-insensitive), skipping repeated header rows. If any are found it prints one warning
-  line naming them: they must be disabled because they hold ports 8080/8443. Tasks are never
+- Does not start the service. It prints `Start it with sc start TesRemoteDesktop or reboot.`
+- After the previous service has been deleted, install runs `schtasks /query /fo csv /v` and passes stdout to `tasks_running_server`. The
+  "Task To Run" column is the header cell of that name. Only that column is matched, against
+  `teslapc.exe` or `tesremotedesktop.exe` (case-insensitive). The task name is still the second
+  column. Header rows are skipped. If any tasks match, one warning names them and both
+  executable names: they must be disabled because they hold ports 8080/8443. Tasks are never
   changed. If `schtasks` cannot run or exits non-zero, nothing is printed.
 - Any SCM failure (most often "Access is denied" without elevation) prints the Win32 error
   text and returns `1`.
 
-`teslapc service uninstall`:
+`tesremotedesktop service uninstall`:
 
 - Opens the service with `QUERY_STATUS | STOP | DELETE`. Not installed
   (`ERROR_SERVICE_DOES_NOT_EXIST`) prints "Nothing to remove" and returns `0`.
@@ -55,14 +66,19 @@ compiled on macOS for `x86_64-pc-windows-msvc`; it has not yet run on Windows.
 - `DeleteService`. `ERROR_SERVICE_MARKED_FOR_DELETE` is reported and returns `0`; other errors
   return `1`.
 
-`teslapc service` with any other word, or extra words, prints `SERVICE_USAGE` and returns `2`
-(`parse_service_command`). On Linux `service install` still writes the systemd unit;
-`service uninstall` prints the `systemctl disable --now` command and returns `1`.
+`tesremotedesktop service uninstall` removes only `TesRemoteDesktop`. It does not open or delete `TeslaPC`.
+
+`tesremotedesktop service` with any other word, or extra words, prints `SERVICE_USAGE` and returns `2`
+(`parse_service_command`). On Linux, `service install` copies the config-folder files
+(`.env`, certificate, key, account) from `~/.config/teslapc` and the database from
+`~/.local/share/teslapc/teslapc.db`, then writes `/etc/systemd/system/tesremotedesktop.service`.
+If `teslapc.service` is present it prints `systemctl disable --now teslapc` and does not run it.
+`service uninstall` prints `systemctl disable --now tesremotedesktop.service && rm /etc/systemd/system/tesremotedesktop.service` and returns `1`.
 
 ## Supervisor (`--service`)
 
 `serve::run` calls `platform::run_as_service()` → `win_service::run_as_service()`, which calls
-`service_dispatcher::start("TeslaPC", ...)`. If the process was not started by the SCM, it
+`service_dispatcher::start("TesRemoteDesktop", ...)`. If the process was not started by the SCM, it
 prints `[Service] Not started by the Service Control Manager (...)` and `run` falls through
 to a normal server run (unchanged behavior). When the dispatcher returns, the process exits `0`.
 
@@ -144,8 +160,8 @@ All handles are owned by `OwnedHandle` (closes on drop) and closed on every path
 
 In `serve::run`, before `.env` is loaded or anything prints:
 
-1. `platform::redirect_host_log()` opens `%ProgramData%\TeslaPC\teslapc.log` (append; over
-   `LOG_ROTATE_BYTES` = 5 MiB at open it is renamed to `teslapc.log.1`, replacing an older
+1. `platform::redirect_host_log()` opens `%ProgramData%\TesRemoteDesktop\tesremotedesktop.log` (append; over
+   `LOG_ROTATE_BYTES` = 5 MiB at open it is renamed to `tesremotedesktop.log.1`, replacing an older
    `.1`) and calls `SetStdHandle` for `STD_OUTPUT_HANDLE` and `STD_ERROR_HANDLE` (a second,
    cloned file handle). Rust's Windows `Stdout`/`Stderr` call `GetStdHandle` on every write
    (`library/std/src/sys/stdio/windows.rs`, Rust 1.98), so every `println!` after this lands in
@@ -168,7 +184,7 @@ the console session.
 
 ## Desktop following (session host only)
 
-A normal `teslapc.exe` run never calls any of this: `capture_loop` only creates a follower
+A normal `tesremotedesktop.exe` run never calls any of this: `capture_loop` only creates a follower
 when `session_host_mode()` was called, and `win::start_input_thread` is only called for
 `--session-host`.
 
@@ -229,8 +245,8 @@ when the `Input` thread first reaches `Default`).
 
 | File | Writer | Content |
 |------|--------|---------|
-| `%ProgramData%\TeslaPC\teslapc.log` (+ `.1`) | session host | everything the server prints (stdout and stderr) |
-| `%ProgramData%\TeslaPC\teslapc-service.log` (+ `.1`) | supervisor (`slog`), and the host if it cannot open its own log | timestamped `[Service]` lines: start, console session changes, every launch (session, pid), every exit (code, uptime), restart reason and delay, every Win32 failure with its error text, stop |
+| `%ProgramData%\TesRemoteDesktop\tesremotedesktop.log` (+ `.1`) | session host | everything the server prints (stdout and stderr) |
+| `%ProgramData%\TesRemoteDesktop\tesremotedesktop-service.log` (+ `.1`) | supervisor (`slog`), and the host if it cannot open its own log | timestamped `[Service]` lines: start, console session changes, every launch (session, pid), every exit (code, uptime), restart reason and delay, every Win32 failure with its error text, stop |
 
 Both rotate at open when larger than 5 MiB (`log_should_rotate`). The supervisor opens the
 file per line.

@@ -1,11 +1,11 @@
 # Input Control
 
-Pointer, wheel, and keyboard JSON on the input WebSocket is turned into host input. The mapping lives in `teslapc/src/decisions/input.rs`. Windows injection is `win.rs`. Linux injection is `linux.rs` (`/dev/uinput`).
+Pointer, wheel, and keyboard JSON on the input WebSocket is turned into host input. The mapping lives in `tesremotedesktop/src/decisions/input.rs`. Windows injection is `win.rs`. Linux injection is `linux.rs` (`/dev/uinput`).
 
 ## User flow
 
 1. The page opens a WebSocket to `/ws/input` (or any path other than `/ws/audio`).
-2. Touch is the default. `TESLAPC_INPUT_MODE=mouse` or `POST /config` `inputMode=mouse` uses the cursor.
+2. Touch is the default. `TESREMOTE_INPUT_MODE=mouse` or `POST /config` `inputMode=mouse` uses the cursor.
 3. Closing the socket ends the touch contact.
 
 ## Messages

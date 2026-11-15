@@ -1,7 +1,9 @@
 # Configuration — Behavior Baseline
 
 - `GET /config` contains `httpsHost`, `acmeEmail`, `videoRoot`, `logLevel`, `streamHeight`, `inputMode`, `version`, `cfTokenSet` and does not contain the Cloudflare token.
-- A blank `cfToken` keeps the stored line.
+- A setting is the first non-blank of: a runtime write, real `TESREMOTE_<NAME>`, real `TESLAPC_<NAME>`, `.env` `TESREMOTE_<NAME>`, `.env` `TESLAPC_<NAME>`.
+- A blank `cfToken` keeps the stored line, including a `TESLAPC_CF_TOKEN` line.
+- Saving a setting writes `TESREMOTE_<NAME>` and removes only the `TESLAPC_<NAME>` line for that setting.
 - Unknown env lines and comments are preserved.
 - `restartNeeded` is true only when host, token, or email was written.
 - Settings Save never sends `streamHeight`, sends only changed fields, and is disabled until `GET /config` has loaded.

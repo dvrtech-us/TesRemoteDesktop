@@ -7,10 +7,10 @@
 
 ## Project Overview
 
-**TeslaPC** is a Rust remote-desktop server for Windows and Linux. One binary serves the screen
-as MJPEG, system audio as PCM, and mouse, touch, and keyboard input to a browser. The Tesla
-in-car browser is reached with a CGNAT address (`100.64.0.1`) on the Windows Mobile Hotspot or,
-on Linux, on `TESLAPC_BYPASS_IFACE`.
+**TesRemoteDesktop** is a Rust remote-desktop server for Windows and Linux. One binary serves the screen
+as MJPEG, system audio as PCM, and mouse, touch, and keyboard input to a browser. The car's
+browser is reached with a CGNAT address (`100.64.0.1`) on the Windows Mobile Hotspot or,
+on Linux, on `TESREMOTE_BYPASS_IFACE`.
 
 ## Architecture
 
@@ -32,24 +32,24 @@ HTTP is on port `8080`. HTTPS is on port `8443`, terminated with rustls inside t
 
 ## Source
 
-The crate is `teslapc/`. `teslapc/src/decisions/` holds the tested protocol functions.
-`teslapc/src/win.rs`, `teslapc/src/win_capture.rs`, `teslapc/src/win_service.rs`, and `teslapc/src/linux.rs` perform the OS calls. `teslapc/assets/` is the browser UI.
+The crate is `tesremotedesktop/`. `tesremotedesktop/src/decisions/` holds the tested protocol functions.
+`tesremotedesktop/src/win.rs`, `tesremotedesktop/src/win_capture.rs`, `tesremotedesktop/src/win_service.rs`, and `tesremotedesktop/src/linux.rs` perform the OS calls. `tesremotedesktop/assets/` is the browser UI.
 
 ## Build & Run
 
 ```bash
-cargo build --manifest-path teslapc/Cargo.toml
-cargo test --manifest-path teslapc/Cargo.toml
+cargo build --manifest-path tesremotedesktop/Cargo.toml
+cargo test --manifest-path tesremotedesktop/Cargo.toml
 .\build.ps1
-teslapc\target\debug\teslapc.exe --localhost
+tesremotedesktop\target\debug\tesremotedesktop.exe --localhost
 ```
 
-`teslapc service install` registers a Windows service or writes a systemd unit;
-`teslapc service uninstall` removes the Windows service. On Windows the service runs
+`tesremotedesktop service install` registers a Windows service or writes a systemd unit;
+`tesremotedesktop service uninstall` removes the Windows service. On Windows the service runs
 `--service`, a supervisor in session 0 that binds no port and starts the server as
-`teslapc.exe --session-host --supervisor-pid <pid>` (SYSTEM, active console session, capture
-starts at DXGI, logs to `%ProgramData%\TeslaPC\teslapc.log`; supervisor log
-`teslapc-service.log`). The host's capture thread and its single `Input` thread follow the
+`tesremotedesktop.exe --session-host --supervisor-pid <pid>` (SYSTEM, active console session, capture
+starts at DXGI, logs to `%ProgramData%\TesRemoteDesktop\tesremotedesktop.log`; supervisor log
+`tesremotedesktop-service.log`). The host's capture thread and its single `Input` thread follow the
 input desktop, so the sign-in, lock, and UAC screens are streamed and take input (mouse path
 off `Default`). Compiled on macOS only; not yet run on Windows.
 
