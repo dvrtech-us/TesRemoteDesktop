@@ -139,7 +139,7 @@ $RECYCLE.BIN/
 _NCrunch*
 /sessions
 /terminals
-/teslapc/target/
+/tesremotedesktop/target/
 .mcp.json
 /mcps
 /publish

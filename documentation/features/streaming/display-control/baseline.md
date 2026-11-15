@@ -6,6 +6,6 @@
 - The stream height is saved and applied only when the chosen mode is the active one; the response carries `streamHeight`.
 - `changed` is true only after the OS accepts the mode.
 - A refused change returns the current size and `changed: false`.
-- The 480/720/1080 control (Settings page only) writes `TESLAPC_STREAM_HEIGHT` only.
+- The 480/720/1080 control (Settings page only) writes `TESREMOTE_STREAM_HEIGHT` only.
 - The Fit screen UI never claims the display "already fits"; `changed: false` is reported as unchanged.
 - Linux match uses the mode list from `wlr-randr` on Wayland and from `xrandr` otherwise. The list is more than the current size when the tool prints more than one mode.

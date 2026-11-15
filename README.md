@@ -1,4 +1,4 @@
-# TeslaPC
+# TesRemoteDesktop
 
 Turn an old laptop into a full desktop you can use from a Tesla's built-in browser, parked or
 in motion.
@@ -12,7 +12,7 @@ There is nothing to install in the car and no app to pair. It is a web page.
 
 > **Passengers only while the car is moving.** A screen showing video or a desktop takes the
 > driver's attention off the road, and watching one while driving is illegal in many places.
-> The driver drives. TeslaPC is for the people in the other seats, and for the driver when
+> The driver drives. TesRemoteDesktop is for the people in the other seats, and for the driver when
 > parked.
 
 ## How it works
@@ -20,7 +20,7 @@ There is nothing to install in the car and no app to pair. It is a web page.
 ```
  laptop (Windows or Linux)                          car
 ┌──────────────────────────────┐   Wi-Fi hotspot  ┌───────────────────────┐
-│ TeslaPC server               │◄────────────────►│ built-in web browser  │
+│ TesRemoteDesktop server      │◄────────────────►│ built-in web browser  │
 │  screen  -> MJPEG video      │                  │  https://your.host    │
 │  sound   -> PCM audio        │                  │        :8443          │
 │  input   <- touch, keys      │                  └───────────────────────┘
@@ -37,9 +37,9 @@ There is nothing to install in the car and no app to pair. It is a web page.
 - **Why it works while driving.** The page is ordinary images and Web Audio, so it runs
   wherever the car's browser runs.
 - **Why the odd address.** The car's browser refuses private network addresses such as
-  `192.168.x.x`. TeslaPC turns on the laptop's Mobile Hotspot, gives the hotspot adapter the
+  `192.168.x.x`. TesRemoteDesktop turns on the laptop's Mobile Hotspot, gives the hotspot adapter the
   address `100.64.0.1`, and forwards ports `8080` and `8443` to itself.
-- **Why HTTPS.** The car's browser treats the page like any other website. TeslaPC can get
+- **Why HTTPS.** The car's browser treats the page like any other website. TesRemoteDesktop can get
   and renew a real Let's Encrypt certificate for your own hostname by itself (DNS-01 through
   Cloudflare), so the car shows no certificate warning.
 
@@ -75,29 +75,29 @@ There is nothing to install in the car and no app to pair. It is a web page.
    .\build.ps1
    ```
 
-   The result is `teslapc\target\release\teslapc.exe`. The web pages are inside the binary.
+   The result is `tesremotedesktop\target\release\tesremotedesktop.exe`. The web pages are inside the binary.
 
-2. **Copy** `teslapc.exe` to the laptop, for example `C:\Program Files\TeslaPC\`.
+2. **Copy** `tesremotedesktop.exe` to the laptop, for example `C:\Program Files\TesRemoteDesktop\`.
 
-3. **Configure** `%ProgramData%\TeslaPC\.env`:
+3. **Configure** `%ProgramData%\TesRemoteDesktop\.env`:
 
    ```
-   TESLAPC_HTTPS_HOST=car.example.com
-   TESLAPC_CF_TOKEN=<your Cloudflare API token>
-   TESLAPC_ACME_EMAIL=you@example.com
-   TESLAPC_VIDEO_ROOT=C:\video\
+   TESREMOTE_HTTPS_HOST=car.example.com
+   TESREMOTE_CF_TOKEN=<your Cloudflare API token>
+   TESREMOTE_ACME_EMAIL=you@example.com
+   TESREMOTE_VIDEO_ROOT=C:\video\
    ```
 
 4. **Install and start the service** from an administrator prompt:
 
    ```powershell
-   cd "C:\Program Files\TeslaPC"
-   .\teslapc.exe service install
-   sc.exe start TeslaPC
+   cd "C:\Program Files\TesRemoteDesktop"
+   .\tesremotedesktop.exe service install
+   sc.exe start TesRemoteDesktop
    ```
 
    The service starts at boot, turns the hotspot on, and restarts the server if it stops.
-   `teslapc.exe service uninstall` removes it.
+   `tesremotedesktop.exe service uninstall` removes it.
 
 5. **Recommended:** set the laptop to sign in automatically and never sleep on power, and set
    the Mobile Hotspot name and password in Windows Settings.
@@ -106,9 +106,30 @@ Notes:
 
 - Windows 11 Smart App Control blocks unsigned builds. Sign the binary or turn Smart App
   Control off on that laptop.
-- Logs are `%ProgramData%\TeslaPC\teslapc.log` (server) and `teslapc-service.log`
+- Logs are `%ProgramData%\TesRemoteDesktop\tesremotedesktop.log` (server) and `tesremotedesktop-service.log`
   (service).
-- To try it on a desk first: `teslapc.exe --localhost`, then open `http://127.0.0.1:8080/`.
+- To try it on a desk first: `tesremotedesktop.exe --localhost`, then open `http://127.0.0.1:8080/`.
+
+## Upgrading from TeslaPC
+
+Run `tesremotedesktop.exe service install` with the new binary, from an administrator prompt.
+On Windows, if a service named `TeslaPC` exists, install clears its restart actions, stops it,
+and waits until that service reports stopped and no `teslapc.exe` process remains (30 seconds).
+If that wait fails, install stops and leaves the old service in place. Otherwise it copies
+`.env`, `cert.pem`, `key.pem`, `acme-account.json`, and `teslapc.db` (saved as
+`tesremotedesktop.db`) from `%ProgramData%\TeslaPC` into `%ProgramData%\TesRemoteDesktop`, and
+only when the new folder does not already have that file. It then creates the
+`TesRemoteDesktop` service and deletes the `TeslaPC` service. It does not start the service,
+and it does not change the old folder or the old binary.
+
+On Linux the same files are copied from `~/.config/teslapc` and `~/.local/share/teslapc`.
+Install writes `tesremotedesktop.service`. If `teslapc.service` is still on disk it prints
+`systemctl disable --now teslapc` and does not run that command.
+
+Settings that still use the `TESLAPC_` prefix keep working. A real environment variable wins
+over `.env`, and `TESREMOTE_` wins over `TESLAPC_` at the same level. Saving a setting writes
+the `TESREMOTE_` line and removes the `TESLAPC_` line for that setting. A script that starts
+`teslapc.exe` itself is not updated.
 
 ## Use it in the car
 
@@ -126,24 +147,29 @@ Set these in `.env`, or on the Settings page where one exists.
 
 | Key | Default | Purpose |
 |-----|---------|---------|
-| `TESLAPC_HTTPS_HOST` | none | Hostname for the trusted certificate |
-| `TESLAPC_CF_TOKEN` | none | Cloudflare API token for certificate issue and renewal |
-| `TESLAPC_ACME_EMAIL` | none | Optional Let's Encrypt contact |
-| `TESLAPC_VIDEO_ROOT` | `C:\video\` | Folder shown by the file browser |
-| `TESLAPC_STREAM_HEIGHT` | `1080` | Largest picture height sent (`240`-`2160`) |
-| `TESLAPC_INPUT_MODE` | `touch` | `touch` or `mouse` |
-| `TESLAPC_LOG_LEVEL` | `info` | `error`, `warn`, `info`, `debug` |
-| `TESLAPC_FFMPEG` | on `PATH` | ffmpeg executable or folder |
-| `TESLAPC_BYPASS_IFACE` | empty | Linux only: interface that carries `100.64.0.1` |
+| `TESREMOTE_HTTPS_HOST` | none | Hostname for the trusted certificate |
+| `TESREMOTE_CF_TOKEN` | none | Cloudflare API token for certificate issue and renewal |
+| `TESREMOTE_ACME_EMAIL` | none | Optional Let's Encrypt contact |
+| `TESREMOTE_ACME_STAGING` | unset | `1` uses the Let's Encrypt staging directory |
+| `TESREMOTE_VIDEO_ROOT` | `C:\video\` | Folder shown by the file browser |
+| `TESREMOTE_STREAM_HEIGHT` | `1080` | Largest picture height sent (`240`-`2160`) |
+| `TESREMOTE_INPUT_MODE` | `touch` | `touch` or `mouse` |
+| `TESREMOTE_LOG_LEVEL` | `info` | `error`, `warn`, `info`, `debug` |
+| `TESREMOTE_FFMPEG` | on `PATH` | ffmpeg executable or folder |
+| `TESREMOTE_NO_WGC` | unset | `1` skips Windows Graphics Capture and starts at DXGI |
+| `TESREMOTE_BYPASS_IFACE` | empty | Linux only: interface that carries `100.64.0.1` |
 
-Flags: `--localhost` (local testing, no hotspot or HTTPS), `--no-tesla-bypass` (skip the
-`100.64.0.1` address), `--https-host <host>`.
+The same names with the prefix `TESLAPC_` are still read when the `TESREMOTE_` value is unset.
+A blank value counts as unset.
+
+Flags: `--localhost` (local testing, no hotspot or HTTPS), `--no-bypass` (skip the
+`100.64.0.1` address; `--no-tesla-bypass` is the same flag), `--https-host <host>`.
 
 ## Linux
 
-The same binary runs on Linux (X11 or Wayland through the desktop portal). `teslapc service
+The same binary runs on Linux (X11 or Wayland through the desktop portal). `tesremotedesktop service
 install` writes a systemd unit. Bringing up the Wi-Fi access point is left to you; set
-`TESLAPC_BYPASS_IFACE` to the access point's interface and TeslaPC adds the address and the
+`TESREMOTE_BYPASS_IFACE` to the access point's interface and TesRemoteDesktop adds the address and the
 forwarding rules.
 
 The Linux build compiles and passes the test suite in CI. This version has not been run on
@@ -164,9 +190,9 @@ a real Linux machine, so treat it as experimental.
 ## For developers
 
 ```bash
-cargo build --manifest-path teslapc/Cargo.toml
-cargo test  --manifest-path teslapc/Cargo.toml
-node teslapc/tests/js/pcm_player.test.js
+cargo build --manifest-path tesremotedesktop/Cargo.toml
+cargo test  --manifest-path tesremotedesktop/Cargo.toml
+node tesremotedesktop/tests/js/pcm_player.test.js
 ```
 
 [AGENTS.md](AGENTS.md) is the operating guide. Feature-by-feature documentation, behavior
@@ -174,6 +200,6 @@ baselines, and decision history are under [documentation/](documentation/README.
 
 ## Not affiliated with Tesla
 
-This is an independent project. It is not made, endorsed, or supported by Tesla, Inc.
-"Tesla" is a trademark of Tesla, Inc. and is used here only to say which car browser the
+TesRemoteDesktop is an independent project. It is not made, endorsed, or supported by Tesla, Inc.
+"Tesla" is a trademark of Tesla, Inc. and is used here only to say which car's browser the
 project works with.

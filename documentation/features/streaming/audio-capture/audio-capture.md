@@ -2,7 +2,7 @@
 
 `/ws/audio` sends one text frame from `format_message`, then binary PCM. Fields are `type` (`format`), `sampleRate`, `bitsPerSample`, `channels`, and `sampleFormat` (`float`, `pcm16`, `pcm24`, or `pcm32`).
 
-Silence is covered with keepalive noise, not zero PCM, so the remote player (the Tesla browser) does not switch audio source during short silences. `decisions/audio.rs` holds the pure functions:
+Silence is covered with keepalive noise, not zero PCM, so the remote player (the car's browser) does not switch audio source during short silences. `decisions/audio.rs` holds the pure functions:
 
 - `is_silent(pcm)` is true when every byte is zero (float and integer PCM).
 - `cover_silence(silent_ms)` is `silent_ms < SILENCE_MAX_MS` (`10000`).
@@ -19,4 +19,4 @@ While a file is playing, `pcm.media_mode` suppresses loopback and `playback::aud
 
 `audio_socket` (`routes.rs`) sends the format frame, then calls `pcm.tx.subscribe()`. Each client gets chunks from its own receiver. A client more than `64` chunks behind gets `RecvError::Lagged(n)`, logs `[Audio] client lagged; skipped <n> chunks` at info level, and continues from the oldest chunk still held; `Closed` ends the socket. Slow clients therefore get recent audio and cannot stall the others. The socket also reads client text frames: `client_stats_line` accepts JSON with `"type":"stats"` of at most `CLIENT_STATS_MAX_BYTES` (`512`) and the browser sends one every 10 s with `bufferedMs`, `minMs`, `underruns`, `trims`, `contextRate`. It is logged at info level as `[Audio] client buffered=<n>ms min=<n>ms underruns=<n> trims=<n> rate=<n>`; missing or non-numeric fields print `?`. Any other frame is ignored.
 
-The browser player is `teslapc/assets/PCMPlayerProcessor.js`.
+The browser player is `tesremotedesktop/assets/PCMPlayerProcessor.js`.
